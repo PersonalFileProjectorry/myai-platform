@@ -151,27 +151,40 @@ Node-RED 예시:
 }
 ````
 
-회로도 예시:
+회로도 예시 (반드시 8개 이상 컴포넌트, 전원/제어/출력 계층 분리):
 ````json
 {
   "type": "circuit",
-  "title": "LED 제어회로",
+  "title": "STM32 모터제어 시스템",
   "components": [
-    {"id":"VCC","type":"power","value":"5V","x":1,"y":5},
-    {"id":"R1","type":"resistor","value":"330Ω","x":3,"y":5},
-    {"id":"LED1","type":"led","value":"적색","x":5,"y":5},
-    {"id":"GND","type":"ground","value":"0V","x":7,"y":5}
+    {"id":"VCC12","type":"power","value":"12V","x":1,"y":8},
+    {"id":"VCC5","type":"power","value":"5V","x":1,"y":5},
+    {"id":"VCC33","type":"power","value":"3.3V","x":1,"y":2},
+    {"id":"LDO","type":"ic","value":"AMS1117","x":3,"y":5},
+    {"id":"STM32","type":"ic","value":"STM32F4","x":5,"y":2},
+    {"id":"DRV","type":"ic","value":"DRV8833","x":5,"y":5},
+    {"id":"MOTOR","type":"ic","value":"DC모터","x":7,"y":5},
+    {"id":"ENC","type":"ic","value":"엔코더","x":7,"y":2},
+    {"id":"C1","type":"capacitor","value":"100uF","x":3,"y":8},
+    {"id":"GND","type":"ground","value":"0V","x":9,"y":8}
   ],
   "connections": [
-    {"from":"VCC","to":"R1"},
-    {"from":"R1","to":"LED1"},
-    {"from":"LED1","to":"GND"}
+    {"from":"VCC12","to":"C1"},{"from":"C1","to":"DRV"},
+    {"from":"VCC5","to":"LDO"},{"from":"LDO","to":"VCC33"},
+    {"from":"VCC33","to":"STM32"},{"from":"STM32","to":"DRV"},
+    {"from":"DRV","to":"MOTOR"},{"from":"ENC","to":"STM32"},
+    {"from":"MOTOR","to":"GND"},{"from":"STM32","to":"GND"}
   ]
 }
-```"""
+````
 
-    return base
-
+규칙:
+- 컴포넌트 최소 8개 이상 포함
+- x,y 좌표로 계층 구분: 전원부(x=1~3), 제어부(x=4~6), 출력부(x=7~9)
+- y축으로 전압 레벨 구분: 고전압(y=7~9), 중간(y=4~6), 저전압(y=1~3)
+- 모든 GND 연결 포함
+- 커패시터, 저항 등 수동소자도 반드시 포함
+````"""
 
 # ── Claude 스트리밍 ──────────────────────────────────────────
 
@@ -370,3 +383,4 @@ async def route_to_model(
             yield chunk
     else:
         yield f"❌ 알 수 없는 모델: {provider}"
+
