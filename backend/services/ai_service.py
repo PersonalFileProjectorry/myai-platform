@@ -36,7 +36,7 @@ def _init_gemini():
     key = os.getenv("GEMINI_API_KEY", "")
     if key:
         genai.configure(api_key=key)
-        return genai.GenerativeModel("gemini-2.0-flash")
+        return genai.GenerativeModel("gemini-2.5-flash")
     return None
 
 def _init_gpt():
@@ -68,7 +68,7 @@ def get_available_models() -> dict:
     if _gemini_model:
         available["gemini"] = {
             "name": "Gemini (Google)",
-            "models": ["gemini-2.0-flash", "gemini-1.5-pro"],
+            "models": ["gemini-2.5-flash"],
             "features": ["검색", "멀티모달", "번역"],
             "status": "active"
         }
@@ -224,7 +224,7 @@ async def stream_claude(
 
 async def stream_gemini(
     messages: list[dict],
-    model: str = "gemini-2.0-flash",
+    model: str = "gemini-2.5-flash",
     context: str = "",
     image_data: Optional[bytes] = None,
 ) -> AsyncGenerator[str, None]:
