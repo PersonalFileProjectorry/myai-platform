@@ -128,8 +128,28 @@ def generate_nodered_diagram(nodes: list, connections: list, title: str = "Node-
 
 
 # ── 회로도 생성 ───────────────────────────────────────────
+def _auto_layout(components: list) -> list:
+    """x,y 없으면 자동으로 2D 배치"""
+    # x,y 있는 것은 그대로
+    has_pos = all("x" in c and "y" in c for c in components)
+    if has_pos:
+        return components
+
+    # 없으면 격자 배치
+    cols = 3
+    gap_x = 2.5
+    gap_y = 2.0
+    for i, comp in enumerate(components):
+        if "x" not in comp:
+            comp["x"] = (i % cols) * gap_x + 1
+        if "y" not in comp:
+            comp["y"] = (i // cols) * gap_y + 1
+    return components
 
 def generate_circuit_diagram(components: list, connections: list, title: str = "회로도") -> str:
+    components = _auto_layout(components)
+    if not components:
+        return ""
     """
     components: [{"id":"R1","type":"resistor","value":"10kΩ","x":1,"y":2}, ...]
     connections: [{"from":"R1","to":"C1"}, ...]
@@ -258,25 +278,47 @@ async def auto_generate_from_response(ai_response: str, diagram_type: str = "aut
     import re
 
     # JSON 블록 추출
-    json_match = re.search(r'```(?:json|diagram)\s*(.*?)\s*```', ai_response, re.DOTALL)
+    json_match = re.search(r'```(?:json|diagram)?\s*(.*?)\s*```', ai_response, re.DOTALL)
     if not json_match:
         return None
 
     try:
-        data = json.loads(json_match.group(1))
+        # 주석 제거 (// 형식)
+        raw = re.sub(r'//[^\n]*', '', json_match.group(1))
+        data = json.loads(raw)
+
+        # 형식 정규화 (from_component_id → from 변환)
+        if "connections" in data:
+            normalized = []
+            for conn in data["connections"]:
+                normalized.append({
+                    "from": conn.get("from") or conn.get("from_component_id", ""),
+                    "to":   conn.get("to")   or conn.get("to_component_id", ""),
+                })
+            data["connections"] = normalized
+
+        # x,y 없으면 자동 배치
+        if "components" in data:
+            for i, comp in enumerate(data["components"]):
+                if "x" not in comp:
+                    comp["x"] = (i % 4) * 2.5 + 1
+                if "y" not in comp:
+                    comp["y"] = (i // 4) * 2.0 + 1
+                # id 정규화
+                if "id" not in comp:
+                    comp["id"] = comp.get("name", f"C{i}")
 
         if diagram_type == "nodered" or data.get("type") == "nodered":
             return generate_nodered_diagram(
                 data.get("nodes", []),
                 data.get("connections", []),
-                data.get("title", "Node-RED Flow")
+                data.get("title", data.get("circuit_name", "Node-RED Flow"))
             )
-        elif diagram_type == "circuit" or data.get("type") == "circuit":
+        elif diagram_type == "circuit" or data.get("type") in ("circuit", None):
             return generate_circuit_diagram(
                 data.get("components", []),
                 data.get("connections", []),
-                data.get("title", "회로도")
+                data.get("title", data.get("circuit_name", "회로도"))
             )
     except Exception as e:
         print(f"다이어그램 생성 오류: {e}")
-        return None
